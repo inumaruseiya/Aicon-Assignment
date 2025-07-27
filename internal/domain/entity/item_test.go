@@ -236,9 +236,6 @@ func TestItem_PatchUpdate(t *testing.T) {
 	item, err := NewItem("初期アイテム", "時計", "初期ブランド", 100000, "2023-01-01")
 	require.NoError(t, err)
 
-	originalUpdatedAt := item.UpdatedAt
-	time.Sleep(1 * time.Millisecond) // UpdatedAt の変更を確認するため
-
 	tests := []struct {
 		name          string
 		newName       *string
@@ -334,6 +331,9 @@ func TestItem_PatchUpdate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			currentUpdatedAt := item.UpdatedAt
+			time.Sleep(1 * time.Millisecond) // UpdatedAt の変更を確認するため
+			
 			err := item.PatchUpdate(tt.newName, tt.newBrand, tt.newPrice)
 
 			if tt.wantErr {
@@ -350,8 +350,7 @@ func TestItem_PatchUpdate(t *testing.T) {
 			assert.Equal(t, tt.expectedPrice, item.PurchasePrice)
 
 			// UpdatedAt が更新されているかチェック
-			assert.True(t, item.UpdatedAt.After(originalUpdatedAt))
-			originalUpdatedAt = item.UpdatedAt
+			assert.True(t, item.UpdatedAt.After(currentUpdatedAt))
 		})
 	}
 }
