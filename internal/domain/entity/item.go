@@ -89,6 +89,53 @@ func (i *Item) Update(name, category, brand string, purchasePrice int, purchaseD
 	return i.Validate()
 }
 
+// アイテムフィールドの部分アップデート（PATCH用）
+func (i *Item) PatchUpdate(name *string, brand *string, purchasePrice *int) error {
+	if name != nil {
+		i.Name = strings.TrimSpace(*name)
+	}
+	if brand != nil {
+		i.Brand = strings.TrimSpace(*brand)
+	}
+	if purchasePrice != nil {
+		i.PurchasePrice = *purchasePrice
+	}
+	i.UpdatedAt = time.Now()
+
+	return i.ValidateForPatch()
+}
+
+// PATCH用のバリデーション（部分更新用）
+func (i *Item) ValidateForPatch() error {
+	var errs []string
+
+	if i.Name != "" && len(i.Name) > 100 {
+		errs = append(errs, "name must be 100 characters or less")
+	}
+
+	if i.Brand != "" && len(i.Brand) > 100 {
+		errs = append(errs, "brand must be 100 characters or less")
+	}
+
+	if i.PurchasePrice < 0 {
+		errs = append(errs, "purchase_price must be 0 or greater")
+	}
+
+	if i.Name == "" {
+		errs = append(errs, "name cannot be empty")
+	}
+
+	if i.Brand == "" {
+		errs = append(errs, "brand cannot be empty")
+	}
+
+	if len(errs) > 0 {
+		return errors.New(strings.Join(errs, ", "))
+	}
+
+	return nil
+}
+
 // カテゴリーのバリデーション
 func isValidCategory(category string) bool {
 	for _, valid := range ValidCategories {
