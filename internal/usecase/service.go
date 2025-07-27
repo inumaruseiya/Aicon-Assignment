@@ -12,6 +12,7 @@ type ItemUsecase interface {
 	GetAllItems(ctx context.Context) ([]*entity.Item, error)
 	GetItemByID(ctx context.Context, id int64) (*entity.Item, error)
 	CreateItem(ctx context.Context, input CreateItemInput) (*entity.Item, error)
+	UpdateItem(ctx context.Context, id int64, input UpdateItemInput) (*entity.Item, error)
 	DeleteItem(ctx context.Context, id int64) error
 	GetCategorySummary(ctx context.Context) (*CategorySummary, error)
 }
@@ -22,6 +23,12 @@ type CreateItemInput struct {
 	Brand         string `json:"brand"`
 	PurchasePrice int    `json:"purchase_price"`
 	PurchaseDate  string `json:"purchase_date"`
+}
+
+type UpdateItemInput struct {
+	Name          *string `json:"name,omitempty"`
+	Brand         *string `json:"brand,omitempty"`
+	PurchasePrice *int    `json:"purchase_price,omitempty"`
 }
 
 type CategorySummary struct {
@@ -83,6 +90,32 @@ func (u *itemUsecase) CreateItem(ctx context.Context, input CreateItemInput) (*e
 	}
 
 	return createdItem, nil
+}
+
+func (u *itemUsecase) UpdateItem(ctx context.Context, id int64, input UpdateItemInput) (*entity.Item, error) {
+	if id <= 0 {
+		return nil, domainErrors.ErrInvalidInput
+	}
+
+	item, err := u.itemRepo.FindByID(ctx, id)
+	if err != nil {
+		if domainErrors.IsNotFoundError(err) {
+			return nil, domainErrors.ErrItemNotFound
+		}
+		return nil, fmt.Errorf("failed to retrieve item: %w", err)
+	}
+
+	err = item.PatchUpdate(input.Name, input.Brand, input.PurchasePrice)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", domainErrors.ErrInvalidInput, err.Error())
+	}
+
+	updatedItem, err := u.itemRepo.Update(ctx, item)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update item: %w", err)
+	}
+
+	return updatedItem, nil
 }
 
 func (u *itemUsecase) DeleteItem(ctx context.Context, id int64) error {
