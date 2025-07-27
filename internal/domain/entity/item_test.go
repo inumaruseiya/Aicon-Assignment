@@ -231,6 +231,213 @@ func TestItem_Update(t *testing.T) {
 	}
 }
 
+func TestItem_PatchUpdate(t *testing.T) {
+	// 初期アイテムを作成
+	item, err := NewItem("初期アイテム", "時計", "初期ブランド", 100000, "2023-01-01")
+	require.NoError(t, err)
+
+	originalUpdatedAt := item.UpdatedAt
+	time.Sleep(1 * time.Millisecond) // UpdatedAt の変更を確認するため
+
+	tests := []struct {
+		name          string
+		newName       *string
+		newBrand      *string
+		newPrice      *int
+		wantErr       bool
+		expectedErr   string
+		expectedName  string
+		expectedBrand string
+		expectedPrice int
+	}{
+		{
+			name:          "正常系: 名前のみ更新",
+			newName:       stringPtr("更新された名前"),
+			newBrand:      nil,
+			newPrice:      nil,
+			wantErr:       false,
+			expectedName:  "更新された名前",
+			expectedBrand: "初期ブランド",
+			expectedPrice: 100000,
+		},
+		{
+			name:          "正常系: ブランドのみ更新",
+			newName:       nil,
+			newBrand:      stringPtr("更新されたブランド"),
+			newPrice:      nil,
+			wantErr:       false,
+			expectedName:  "更新された名前", // 前のテストから継続
+			expectedBrand: "更新されたブランド",
+			expectedPrice: 100000,
+		},
+		{
+			name:          "正常系: 価格のみ更新",
+			newName:       nil,
+			newBrand:      nil,
+			newPrice:      intPtr(200000),
+			wantErr:       false,
+			expectedName:  "更新された名前", // 前のテストから継続
+			expectedBrand: "更新されたブランド", // 前のテストから継続
+			expectedPrice: 200000,
+		},
+		{
+			name:          "正常系: 全フィールド更新",
+			newName:       stringPtr("最終名前"),
+			newBrand:      stringPtr("最終ブランド"),
+			newPrice:      intPtr(300000),
+			wantErr:       false,
+			expectedName:  "最終名前",
+			expectedBrand: "最終ブランド",
+			expectedPrice: 300000,
+		},
+		{
+			name:        "異常系: 空の名前",
+			newName:     stringPtr(""),
+			newBrand:    nil,
+			newPrice:    nil,
+			wantErr:     true,
+			expectedErr: "name cannot be empty",
+		},
+		{
+			name:        "異常系: 空のブランド",
+			newName:     nil,
+			newBrand:    stringPtr(""),
+			newPrice:    nil,
+			wantErr:     true,
+			expectedErr: "brand cannot be empty",
+		},
+		{
+			name:        "異常系: 負の価格",
+			newName:     nil,
+			newBrand:    nil,
+			newPrice:    intPtr(-1),
+			wantErr:     true,
+			expectedErr: "purchase_price must be 0 or greater",
+		},
+		{
+			name:        "異常系: 名前が100文字超過",
+			newName:     stringPtr("ロレックス デイトナ 16520 18K イエローゴールド ブラック文字盤 自動巻き クロノグラフ メンズ 腕時計 1988年製 ヴィンテージ 希少 コレクション アイテム"),
+			newBrand:    nil,
+			newPrice:    nil,
+			wantErr:     true,
+			expectedErr: "name must be 100 characters or less",
+		},
+		{
+			name:        "異常系: ブランドが100文字超過",
+			newName:     nil,
+			newBrand:    stringPtr("ROLEX SA Geneva Switzerland Official Authorized Dealer Store Premium Collection Limited Edition Special"),
+			newPrice:    nil,
+			wantErr:     true,
+			expectedErr: "brand must be 100 characters or less",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := item.PatchUpdate(tt.newName, tt.newBrand, tt.newPrice)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErr)
+				return
+			}
+
+			assert.NoError(t, err)
+
+			// 更新後の値をチェック
+			assert.Equal(t, tt.expectedName, item.Name)
+			assert.Equal(t, tt.expectedBrand, item.Brand)
+			assert.Equal(t, tt.expectedPrice, item.PurchasePrice)
+
+			// UpdatedAt が更新されているかチェック
+			assert.True(t, item.UpdatedAt.After(originalUpdatedAt))
+			originalUpdatedAt = item.UpdatedAt
+		})
+	}
+}
+
+func TestItem_ValidateForPatch(t *testing.T) {
+	tests := []struct {
+		name        string
+		item        *Item
+		wantErr     bool
+		expectedErr string
+	}{
+		{
+			name: "正常系: 有効なアイテム",
+			item: &Item{
+				Name:          "ロレックス デイトナ",
+				Brand:         "ROLEX",
+				PurchasePrice: 1500000,
+			},
+			wantErr: false,
+		},
+		{
+			name: "異常系: 空の名前",
+			item: &Item{
+				Name:          "",
+				Brand:         "ROLEX",
+				PurchasePrice: 1500000,
+			},
+			wantErr:     true,
+			expectedErr: "name cannot be empty",
+		},
+		{
+			name: "異常系: 空のブランド",
+			item: &Item{
+				Name:          "ロレックス デイトナ",
+				Brand:         "",
+				PurchasePrice: 1500000,
+			},
+			wantErr:     true,
+			expectedErr: "brand cannot be empty",
+		},
+		{
+			name: "異常系: 負の価格",
+			item: &Item{
+				Name:          "ロレックス デイトナ",
+				Brand:         "ROLEX",
+				PurchasePrice: -1,
+			},
+			wantErr:     true,
+			expectedErr: "purchase_price must be 0 or greater",
+		},
+		{
+			name: "異常系: 複数のバリデーションエラー",
+			item: &Item{
+				Name:          "",
+				Brand:         "",
+				PurchasePrice: -1,
+			},
+			wantErr:     true,
+			expectedErr: "purchase_price must be 0 or greater",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.item.ValidateForPatch()
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErr)
+				return
+			}
+
+			assert.NoError(t, err)
+		})
+	}
+}
+
+// ヘルパー関数
+func stringPtr(s string) *string {
+	return &s
+}
+
+func intPtr(i int) *int {
+	return &i
+}
+
 func TestItem_Validate(t *testing.T) {
 	tests := []struct {
 		name        string
